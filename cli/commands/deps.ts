@@ -9,16 +9,21 @@ import { ok, fail } from "../output.js";
 export async function depsCommand(argv: string[]): Promise<void> {
   const { positionals, values } = parseArgs({
     args: argv,
-    options: { pretty: { type: "boolean" } },
+    options: {
+      pretty: { type: "boolean" },
+      type:   { type: "string" },
+    },
     allowPositionals: true,
     strict: false,
   });
 
   const id = positionals[0];
-  if (!id) fail("Usage: plumb deps <idOrSeq>", "INVALID_ARGS", 2);
+  if (!id) fail("Usage: plumb deps <idOrSeq> [--type blocks]", "INVALID_ARGS", 2);
+
+  const edgeType = values.type as string | undefined ?? "blocks";
 
   try {
-    const deps = getDeps(id);
+    const deps = getDeps(id as string, edgeType);
     if (values.pretty) {
       if (deps.length === 0) {
         process.stdout.write("(no blocking dependencies)\n");

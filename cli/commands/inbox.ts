@@ -1,10 +1,30 @@
 /**
- * cli/commands/inbox.ts — plumb inbox add|list|resolve
+ * cli/commands/inbox.ts — plumb inbox add|list|resolve (v3)
  */
 
 import { parseArgs } from "node:util";
-import { inboxAdd, inboxList, inboxResolve } from "../../lib/issues.js";
+import { inboxAdd, inboxList, inboxResolve, type WriteOptions } from "../../lib/issues.js";
 import { ok, fail, readStdin } from "../output.js";
+
+const PROV_OPTIONS = {
+  actor:       { type: "string" as const },
+  reason:      { type: "string" as const },
+  conf:        { type: "string" as const },
+  session:     { type: "string" as const },
+  "op-id":     { type: "string" as const },
+  "raw-input": { type: "string" as const },
+} as const;
+
+function extractProv(values: Record<string, unknown>): WriteOptions {
+  const prov: WriteOptions = {};
+  if (values.actor)        prov.actor      = values.actor as string;
+  if (values.reason)       prov.reason     = values.reason as string;
+  if (values.conf)         prov.conf       = parseFloat(values.conf as string);
+  if (values.session)      prov.session_id = values.session as string;
+  if (values["op-id"])     prov.op_id      = values["op-id"] as string;
+  if (values["raw-input"]) prov.raw_input  = values["raw-input"] as string;
+  return prov;
+}
 
 export async function inboxCommand(argv: string[]): Promise<void> {
   const sub = argv[0];
@@ -22,7 +42,11 @@ export async function inboxCommand(argv: string[]): Promise<void> {
 async function inboxAdd_cmd(argv: string[]): Promise<void> {
   const { positionals, values } = parseArgs({
     args: argv,
-    options: { stdin: { type: "boolean" } },
+    options: {
+      stdin:  { type: "boolean" },
+      origin: { type: "string" },
+      ...PROV_OPTIONS,
+    },
     allowPositionals: true,
     strict: false,
   });
@@ -36,7 +60,8 @@ async function inboxAdd_cmd(argv: string[]): Promise<void> {
 
   if (!raw) fail("Inbox item text is required (pass as argument or via stdin)", "INVALID_ARGS", 2);
 
-  const item = inboxAdd(raw);
+  const prov = extractProv(values as Record<string, unknown>);
+  const item = inboxAdd(raw, { ...prov, origin: values.origin as string | undefined });
   ok(item);
 }
 
@@ -74,7 +99,10 @@ async function inboxList_cmd(argv: string[]): Promise<void> {
 async function inboxResolve_cmd(argv: string[]): Promise<void> {
   const { positionals, values } = parseArgs({
     args: argv,
-    options: { issue: { type: "string" } },
+    options: {
+      issue: { type: "string" },
+      ...PROV_OPTIONS,
+    },
     allowPositionals: true,
     strict: false,
   });
@@ -83,7 +111,7 @@ async function inboxResolve_cmd(argv: string[]): Promise<void> {
   if (!id) fail("Usage: plumb inbox resolve <id> [--issue <idOrSeq>]", "INVALID_ARGS", 2);
 
   try {
-    const item = inboxResolve(id, values.issue as string | undefined);
+    const item = inboxResolve(id as string, values.issue as string | undefined, extractProv(values as Record<string, unknown>));
     ok(item);
   } catch (e: unknown) {
     const err = e as { message: string; code?: string };

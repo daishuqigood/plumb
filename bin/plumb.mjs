@@ -9,7 +9,12 @@ import { spawnSync } from "node:child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgDir = resolve(__dirname, "..");
-const env = { ...process.env, PLUMB_DIR: pkgDir };
+// Only inject PLUMB_DIR when running from the source tree (dev mode).
+// When installed globally, do NOT override PLUMB_DIR so the v3 XDG
+// directory resolution in lib/db.ts takes effect.
+const env = existsSync(resolve(pkgDir, "cli", "plumb.ts"))
+  ? { ...process.env, PLUMB_DIR: process.env.PLUMB_DIR ?? pkgDir }
+  : { ...process.env };
 
 const distEntry = resolve(pkgDir, "dist", "cli", "plumb.js");
 
